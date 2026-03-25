@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { registerStep1, verifyOTP } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
-import { ChevronLeft, Dumbbell, Eye, EyeOff, CheckCircle2 } from 'lucide-react';
+import { ChevronLeft, Dumbbell, Eye, EyeOff, Copy, CheckCircle2 } from 'lucide-react';
 
 const HOSTELS = [
   'NH-1','NH-2','NH-3','NH-4','NH-5','NH-6','NH-7','NH-8','NH-9',
@@ -15,16 +15,18 @@ const steps = ['Details', 'Verify', 'Done'];
 export default function RegisterPage() {
   const { login } = useAuth();
   const navigate   = useNavigate();
-  const [step, setStep] = useState(0);
+  const [step, setStep]     = useState(0);
   const [loading, setLoading] = useState(false);
-  const [show, setShow] = useState(false);
+  const [show, setShow]     = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const [form, setForm] = useState({
     name: '', rollNo: '', email: '', phone: '', gender: '', hostel: '', room: '',
   });
-  const [otp, setOtp]         = useState('');
-  const [password, setPass]   = useState('');
-  const [confirm, setConfirm] = useState('');
+  const [otp, setOtp]           = useState('');
+  const [shownOtp, setShownOtp] = useState(''); // OTP returned from server
+  const [password, setPass]     = useState('');
+  const [confirm, setConfirm]   = useState('');
   const [savedEmail, setSavedEmail] = useState('');
 
   const handle = (e) => setForm({ ...form, [e.target.name]: e.target.value });
@@ -36,9 +38,16 @@ export default function RegisterPage() {
       return toast.error('All fields are required');
     setLoading(true);
     try {
-      await registerStep1(form);
+      const data = await registerStep1(form);
       setSavedEmail(email);
-      toast.success('OTP sent to your KIIT email!');
+      // Auto-fill OTP if returned by server
+      if (data.otp) {
+        setShownOtp(data.otp);
+        setOtp(data.otp);
+        toast.success('OTP generated! It\'s shown below — copy it.');
+      } else {
+        toast.success('OTP sent to your KIIT email!');
+      }
       setStep(1);
     } catch (err) {
       toast.error(err.message);
@@ -56,7 +65,6 @@ export default function RegisterPage() {
     try {
       await verifyOTP({ rollNo: form.rollNo, otp, password });
       toast.success('Account created!');
-      // Auto-login
       await login(savedEmail, password);
       navigate('/');
     } catch (err) {
@@ -64,6 +72,12 @@ export default function RegisterPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const copyOtp = () => {
+    navigator.clipboard.writeText(shownOtp);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   return (
@@ -135,8 +149,8 @@ export default function RegisterPage() {
             </div>
             <button type="submit" disabled={loading} className="btn-primary w-full mt-2">
               {loading ? <span className="flex items-center justify-center gap-2">
-                <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Sending OTP…
-              </span> : 'Send OTP'}
+                <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Generating OTP…
+              </span> : 'Get OTP'}
             </button>
           </form>
         )}
@@ -144,19 +158,40 @@ export default function RegisterPage() {
         {/* Step 1: OTP + Password */}
         {step === 1 && (
           <form onSubmit={submitStep2} className="space-y-4 animate-fadeUp">
-            <div className="card text-center mb-2">
-              <p className="text-sm text-gray-400">OTP sent to</p>
-              <p className="text-brand font-medium">{savedEmail}</p>
-            </div>
+
+            {/* OTP display box */}
+            {shownOtp ? (
+              <div className="card border-brand/40 text-center">
+                <p className="text-xs text-gray-400 mb-2 uppercase tracking-widest">Your OTP</p>
+                <div className="flex items-center justify-center gap-3">
+                  <span className="font-display text-4xl font-bold tracking-[0.3em] text-brand">{shownOtp}</span>
+                  <button type="button" onClick={copyOtp}
+                    className="text-gray-400 hover:text-brand transition-colors">
+                    {copied ? <CheckCircle2 size={20} className="text-green-400" /> : <Copy size={20} />}
+                  </button>
+                </div>
+                <p className="text-xs text-gray-500 mt-2">Valid for 10 minutes</p>
+              </div>
+            ) : (
+              <div className="card text-center mb-2">
+                <p className="text-sm text-gray-400">OTP sent to</p>
+                <p className="text-brand font-medium">{savedEmail}</p>
+              </div>
+            )}
+
             <div>
-              <label className="label">OTP (6 digits)</label>
-              <input type="text" maxLength={6} className="input-field text-center text-2xl tracking-[0.5em] font-display"
-                placeholder="——————" value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))} />
+              <label className="label">Enter OTP</label>
+              <input type="text" maxLength={6}
+                className="input-field text-center text-2xl tracking-[0.5em] font-display"
+                placeholder="——————"
+                value={otp}
+                onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))} />
             </div>
             <div>
               <label className="label">Create Password</label>
               <div className="relative">
-                <input type={show ? 'text' : 'password'} className="input-field pr-11" placeholder="Min 8 characters"
+                <input type={show ? 'text' : 'password'} className="input-field pr-11"
+                  placeholder="Min 8 characters"
                   value={password} onChange={(e) => setPass(e.target.value)} />
                 <button type="button" onClick={() => setShow(!show)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300">
@@ -174,7 +209,8 @@ export default function RegisterPage() {
                 <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Creating…
               </span> : 'Create Account'}
             </button>
-            <button type="button" onClick={() => setStep(0)} className="btn-ghost w-full flex items-center justify-center gap-1">
+            <button type="button" onClick={() => { setStep(0); setShownOtp(''); setOtp(''); }}
+              className="btn-ghost w-full flex items-center justify-center gap-1">
               <ChevronLeft size={16} /> Back
             </button>
           </form>
