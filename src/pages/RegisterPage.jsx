@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { signInWithEmailAndPassword, sendEmailVerification, signOut } from 'firebase/auth';
+import { auth } from '../firebase';
 import { registerStep1, verifyOTP } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
@@ -14,11 +16,11 @@ const steps = ['Details', 'Verify', 'Done'];
 export default function RegisterPage() {
   const { login } = useAuth();
   const navigate   = useNavigate();
-  const [step, setStep]       = useState(0);
-  const [loading, setLoading] = useState(false);
-  const [show, setShow]       = useState(false);
-  const [copied, setCopied]   = useState(false);
-  const [method, setMethod]   = useState('otp'); // 'otp' | 'link'
+  const [step, setStep]           = useState(0);
+  const [loading, setLoading]     = useState(false);
+  const [show, setShow]           = useState(false);
+  const [copied, setCopied]       = useState(false);
+  const [method, setMethod]       = useState('otp');
 
   const [form, setForm] = useState({
     name:'', rollNo:'', email:'', phone:'', gender:'', hostel:'', room:'',
@@ -28,7 +30,8 @@ export default function RegisterPage() {
   const [password, setPass]     = useState('');
   const [confirm, setConfirm]   = useState('');
   const [savedEmail, setSaved]  = useState('');
-  const [linkSent, setLinkSent] = useState(false);
+  const [pendingUid, setPendingUid] = useState('');
+  const [emailSent, setEmailSent]   = useState(false);
 
   const handle = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
@@ -41,10 +44,25 @@ export default function RegisterPage() {
     try {
       const data = await registerStep1({ ...form, verificationMethod: method });
       setSaved(email);
+
       if (method === 'link') {
-        setLinkSent(true);
-        toast.success('Verification link sent! Check your KIIT email.');
+        // Backend created user with tempPassword — sign in and trigger Firebase email
+        setPendingUid(data.uid);
+        try {
+          const cred = await signInWithEmailAndPassword(auth, email, data.tempPassword);
+          await sendEmailVerification(cred.user, {
+            url: `${window.location.origin}/login`,
+            handleCodeInApp: false,
+          });
+          await signOut(auth); // sign out immediately — user isn't registered yet
+          setEmailSent(true);
+          toast.success('Verification email sent by Firebase! Check your inbox.');
+        } catch (firebaseErr) {
+          console.error('sendEmailVerification error:', firebaseErr.message);
+          toast.error('Could not send verification email: ' + firebaseErr.message);
+        }
       } else {
+        // OTP method
         if (data.otp) { setShownOtp(data.otp); setOtp(data.otp); }
         toast.success('OTP ready!');
       }
@@ -58,17 +76,34 @@ export default function RegisterPage() {
 
   const submitStep2 = async (e) => {
     e.preventDefault();
-    if (method === 'link') {
-      // Link method: user just sets password after clicking email link
-      if (password.length < 8) return toast.error('Password must be at least 8 characters');
-      if (password !== confirm) return toast.error('Passwords do not match');
-      toast.success('Please click the verification link in your email first, then login.');
-      navigate('/login');
-      return;
-    }
-    if (!otp) return toast.error('Enter the OTP');
     if (password.length < 8) return toast.error('Password must be at least 8 characters');
     if (password !== confirm) return toast.error('Passwords do not match');
+
+    if (method === 'link') {
+      // User has clicked the Firebase verification link — now set real password
+      // The backend completeLinkVerification endpoint handles this
+      setLoading(true);
+      try {
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/auth/register/complete`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ uid: pendingUid, password }),
+        });
+        const data = await res.json();
+        if (!res.ok) return toast.error(data.error || 'Failed to complete registration');
+        toast.success('Account created! Logging you in…');
+        await login(savedEmail, password);
+        navigate('/');
+      } catch (err) {
+        toast.error(err.message);
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
+    // OTP method
+    if (!otp) return toast.error('Enter the OTP');
     setLoading(true);
     try {
       await verifyOTP({ rollNo: form.rollNo, otp, password });
@@ -88,10 +123,19 @@ export default function RegisterPage() {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const resendVerification = async () => {
+    // Re-send Firebase verification email
+    toast('Resending verification email…');
+    // We need to sign in with temp password again — not stored for security
+    // Direct user to re-register if needed
+    toast('Please go back and register again if you did not receive the email.');
+  };
+
   return (
     <div className="min-h-screen bg-surface flex flex-col items-center justify-center px-4 py-10">
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-96 h-96 bg-brand/5 rounded-full blur-3xl pointer-events-none" />
       <div className="w-full max-w-sm relative">
+
         {/* Logo */}
         <div className="flex flex-col items-center mb-8">
           <div className="w-14 h-14 bg-brand rounded-2xl flex items-center justify-center mb-3 shadow-lg shadow-brand/30">
@@ -114,11 +158,10 @@ export default function RegisterPage() {
           ))}
         </div>
 
-        {/* Step 0: Details + verification method */}
+        {/* ── Step 0: Details ── */}
         {step === 0 && (
           <form onSubmit={submitStep1} className="space-y-4 animate-fadeUp">
-
-            {/* Verification method picker */}
+            {/* Verification method */}
             <div>
               <label className="label">Verification Method</label>
               <div className="grid grid-cols-2 gap-2">
@@ -135,8 +178,8 @@ export default function RegisterPage() {
               </div>
               <p className="text-xs text-gray-500 mt-1.5">
                 {method === 'otp'
-                  ? 'A 6-digit OTP will be shown on screen and sent to your email'
-                  : 'A verification link will be sent to your KIIT email to click'}
+                  ? 'A 6-digit OTP will be shown on screen instantly'
+                  : 'Firebase will send a verification link to your KIIT email'}
               </p>
             </div>
 
@@ -179,40 +222,46 @@ export default function RegisterPage() {
             </div>
 
             <button type="submit" disabled={loading} className="btn-primary w-full">
-              {loading ? <span className="flex items-center justify-center gap-2">
-                <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                {method === 'otp' ? 'Generating OTP…' : 'Sending Link…'}
-              </span> : method === 'otp' ? 'Get OTP' : 'Send Verification Link'}
+              {loading
+                ? <span className="flex items-center justify-center gap-2">
+                    <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    {method === 'otp' ? 'Generating OTP…' : 'Sending verification email…'}
+                  </span>
+                : method === 'otp' ? 'Get OTP' : 'Send Verification Email'}
             </button>
           </form>
         )}
 
-        {/* Step 1: OTP entry OR link sent confirmation */}
+        {/* ── Step 1: Verify ── */}
         {step === 1 && (
           <form onSubmit={submitStep2} className="space-y-4 animate-fadeUp">
 
             {method === 'link' ? (
-              /* Email link sent */
+              /* Email link sent by Firebase */
               <div className="card border-brand/40 text-center space-y-3">
                 <div className="w-14 h-14 bg-brand/20 rounded-2xl flex items-center justify-center mx-auto">
-                  <Mail size={28} className="text-brand" />
+                  {emailSent
+                    ? <CheckCircle2 size={28} className="text-green-400" />
+                    : <Mail size={28} className="text-brand" />}
                 </div>
                 <div>
-                  <p className="font-semibold">Check Your Email</p>
+                  <p className="font-semibold">{emailSent ? 'Email Sent!' : 'Sending…'}</p>
                   <p className="text-sm text-gray-400 mt-1">
-                    A verification link was sent to
+                    Firebase sent a verification link to:
                   </p>
                   <p className="text-brand font-medium text-sm">{savedEmail}</p>
                 </div>
-                <div className="bg-surface rounded-xl p-3 text-xs text-gray-400 text-left space-y-1">
-                  <p>1. Open your KIIT email inbox</p>
-                  <p>2. Click the <strong className="text-white">"Verify Email Address"</strong> button</p>
-                  <p>3. Come back here and login with the password you set</p>
+                <div className="bg-surface rounded-xl p-3 text-xs text-gray-400 text-left space-y-1.5">
+                  <p>1. 📧 Open your KIIT email inbox (check spam too)</p>
+                  <p>2. 🔗 Click <strong className="text-white">"Verify your email"</strong></p>
+                  <p>3. ✅ Come back here and set your password below</p>
                 </div>
-                <p className="text-xs text-gray-500">Check spam folder if not received</p>
+                <p className="text-xs text-gray-500">
+                  Sent from: <span className="text-white">noreply@kiit-gym-prod.firebaseapp.com</span>
+                </p>
               </div>
             ) : (
-              /* OTP display */
+              /* OTP shown on screen */
               shownOtp && (
                 <div className="card border-brand/40 text-center">
                   <p className="text-xs text-gray-400 mb-2 uppercase tracking-widest">Your OTP</p>
@@ -227,6 +276,7 @@ export default function RegisterPage() {
               )
             )}
 
+            {/* OTP input — only for OTP method */}
             {method === 'otp' && (
               <div>
                 <label className="label">Enter OTP</label>
@@ -237,8 +287,11 @@ export default function RegisterPage() {
               </div>
             )}
 
+            {/* Password fields */}
             <div>
-              <label className="label">Create Password</label>
+              <label className="label">
+                {method === 'link' ? 'Set Your Password (after verifying email)' : 'Create Password'}
+              </label>
               <div className="relative">
                 <input type={show ? 'text' : 'password'} className="input-field pr-11"
                   placeholder="Min 8 characters" value={password} onChange={(e) => setPass(e.target.value)} />
@@ -255,11 +308,15 @@ export default function RegisterPage() {
             </div>
 
             <button type="submit" disabled={loading} className="btn-primary w-full">
-              {loading ? <span className="flex items-center justify-center gap-2">
-                <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Creating…
-              </span> : method === 'link' ? 'Set Password & Continue' : 'Create Account'}
+              {loading
+                ? <span className="flex items-center justify-center gap-2">
+                    <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Creating…
+                  </span>
+                : method === 'link' ? 'Complete Registration' : 'Create Account'}
             </button>
-            <button type="button" onClick={() => { setStep(0); setShownOtp(''); setOtp(''); setLinkSent(false); }}
+
+            <button type="button"
+              onClick={() => { setStep(0); setShownOtp(''); setOtp(''); setEmailSent(false); setPendingUid(''); }}
               className="btn-ghost w-full flex items-center justify-center gap-1">
               <ChevronLeft size={16} /> Back
             </button>
