@@ -140,11 +140,12 @@ function GymsTab() {
   const { data: gyms, isLoading } = useQuery({ queryKey: ['gyms'], queryFn: getGyms });
   const [showCreate, setShowCreate] = useState(false);
   const [editGym, setEditGym] = useState(null);
-  const [form, setForm] = useState({ id: '', name: '', campus: '', gender: 'male', capacityPerSlot: 20, description: '', location: '' });
+  const [form, setForm] = useState({ id: '', name: '', campus: '', gender: 'male', capacityPerSlot: 20, description: '', location: '', mapLink: '' });
+  const [newGymId, setNewGymId] = useState('');
 
   const createMut = useMutation({
     mutationFn: saCreateGym,
-    onSuccess: () => { toast.success('Gym created!'); qc.invalidateQueries(['gyms']); setShowCreate(false); setForm({ id:'', name:'', campus:'', gender:'male', capacityPerSlot:20, description:'', location:'' }); },
+    onSuccess: (data) => { toast.success('Gym created!'); qc.invalidateQueries(['gyms']); setNewGymId(form.id); setShowCreate(false); setForm({ id:'', name:'', campus:'', gender:'male', capacityPerSlot:20, description:'', location:'', mapLink:'' }); },
     onError: (e) => toast.error(e.message),
   });
 
@@ -226,6 +227,8 @@ function GymsTab() {
               <input className="input-field" placeholder="Building/block details" value={form.location} onChange={e=>setForm({...form,location:e.target.value})} /></div>
             <div className="col-span-2"><label className="label">Description</label>
               <textarea rows={2} className="input-field resize-none" value={form.description} onChange={e=>setForm({...form,description:e.target.value})} /></div>
+            <div className="col-span-2"><label className="label">Google Maps Link (optional)</label>
+              <input className="input-field" placeholder="https://maps.google.com/?q=..." value={form.mapLink||''} onChange={e=>setForm({...form,mapLink:e.target.value})} /></div>
           </div>
           <button onClick={() => createMut.mutate(form)} disabled={createMut.isPending} className="btn-primary w-full">
             {createMut.isPending ? 'Creating…' : 'Create Gym'}
@@ -248,7 +251,12 @@ function GymsTab() {
                 onChange={e => setEditGym({ ...editGym, gender: e.target.value })}>
                 <option value="male">Boys</option><option value="female">Girls</option><option value="both">Co-ed</option>
               </select></div>
-            <button onClick={() => editMut.mutate({ gymId: editGym.id, data: { description: editGym.description, capacityPerSlot: editGym.capacityPerSlot, gender: editGym.gender } })}
+            <div><label className="label">Google Maps Link</label>
+              <input className="input-field" placeholder="https://maps.google.com/?q=..." defaultValue={editGym.mapLink||''}
+                onChange={e => setEditGym({ ...editGym, mapLink: e.target.value })} /></div>
+            <div><label className="label">Gym Photos</label>
+              <GymImageManager gymId={editGym.id} images={editGym.images||[]} onImagesChange={(imgs)=>setEditGym({...editGym,images:imgs})} /></div>
+            <button onClick={() => editMut.mutate({ gymId: editGym.id, data: { description: editGym.description, capacityPerSlot: editGym.capacityPerSlot, gender: editGym.gender, mapLink: editGym.mapLink || '' } })}
               disabled={editMut.isPending} className="btn-primary w-full flex items-center justify-center gap-2">
               <Save size={16} />{editMut.isPending ? 'Saving…' : 'Save Changes'}
             </button>

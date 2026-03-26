@@ -2,7 +2,8 @@ import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getGym, getSlotAvailability } from '../services/api';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
-import { MapPin, Users, UserCircle2, Dumbbell, ChevronDown, ChevronUp, BookOpen } from 'lucide-react';
+import { MapPin, Users, UserCircle2, Dumbbell, ChevronDown, ChevronUp, BookOpen, Navigation2, ImageIcon } from 'lucide-react';
+import { GymImageManager } from '../components/ImageUpload';
 import { format } from 'date-fns';
 import { useState } from 'react';
 
@@ -61,11 +62,28 @@ export default function GymDetailPage() {
       {/* Header */}
       <div>
         <h2 className="font-display text-2xl font-bold tracking-wider uppercase">{gym.name}</h2>
-        <div className="flex items-center gap-3 mt-1 text-sm text-gray-400">
+        <div className="flex items-center gap-3 mt-1 text-sm text-gray-400 flex-wrap">
           <span className="flex items-center gap-1"><MapPin size={14}/>{gym.location}</span>
+          {gym.mapLink && (
+            <a href={gym.mapLink} target="_blank" rel="noopener noreferrer"
+              className="flex items-center gap-1 text-brand hover:text-brand-light font-semibold transition-colors">
+              <Navigation2 size={14}/> Open in Maps
+            </a>
+          )}
         </div>
         <p className="text-sm text-gray-400 mt-2">{gym.description}</p>
       </div>
+
+      {/* Photo Gallery */}
+      {gym.images && gym.images.length > 0 && (
+        <div className="card">
+          <div className="flex items-center gap-2 mb-3">
+            <ImageIcon size={16} className="text-brand"/>
+            <p className="section-title mb-0">Photos ({gym.images.length})</p>
+          </div>
+          <GymImageManager gymId={gymId} images={gym.images} readOnly={true} onImagesChange={()=>{}} />
+        </div>
+      )}
 
       {/* Live busy chart */}
       <div className="card">

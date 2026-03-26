@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { getGyms } from '../services/api';
 import { useAuth } from '../context/AuthContext';
-import { MapPin, Users, ChevronRight, Dumbbell } from 'lucide-react';
+import { MapPin, Users, ChevronRight, Dumbbell, Navigation2 } from 'lucide-react';
 
 const GENDER_LABELS = { male: '♂ Boys', female: '♀ Girls', both: '⚧ All' };
 const GENDER_COLORS = { male: 'text-blue-400', female: 'text-pink-400', both: 'text-purple-400' };

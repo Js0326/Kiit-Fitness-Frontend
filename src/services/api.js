@@ -97,3 +97,21 @@ export const saGetSubscriptions = (params)     => api.get('/sa/subscriptions', {
 export const saGetComplaints    = (params)     => api.get('/sa/complaints', { params });
 export const saResolveComplaint = (id, data)   => api.put(`/sa/complaints/${id}`, data);
 export const saGetAttendance    = (params)     => api.get('/sa/attendance', { params });
+
+// ── Upload (Cloudinary via backend) ──────────────────────────
+export const uploadGymImages      = (formData)     => api.post('/upload/gym', formData, { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 30000 });
+export const uploadComplaintImage = (formData)     => api.post('/upload/complaint', formData, { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 30000 });
+export const deleteUploadedImage  = (publicId)     => api.delete('/upload/image', { data: { publicId } });
+
+// ── Email link registration ────────────────────────────────────
+export const checkPendingReg      = (rollNo)       => api.get('/auth/register/pending', { params: { rollNo } });
+export const completeRegistration = (data)         => api.post('/auth/register/complete', data);
+
+// ── Auth — verification methods ───────────────────────────────
+export const registerStep1Link   = (data)      => api.post('/auth/register/step1', { ...data, verificationMethod: 'link' });
+export const completeLinkVerify  = (data)      => api.post('/auth/register/complete', data);
+
+// ── Gym images ────────────────────────────────────────────────
+// Note: image uploads use fetch directly in ImageUpload.jsx (multipart/form-data)
+// These are for URL-only updates
+export const deleteGymImageApi   = (gymId, publicId) => api.delete(`/gyms/${gymId}/images/${encodeURIComponent(publicId)}`);
