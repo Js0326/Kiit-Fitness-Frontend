@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import { MessageSquare, Plus, X, Image as ImageIcon } from 'lucide-react';
-import ImageUploader from '../components/ImageUploader';
+import { ComplaintImageUploader } from '../components/ImageUpload';
 
 const CATEGORIES = ['Equipment Issue','Cleanliness','Staff Behaviour','Overcrowding','Facility Damage','Other'];
 
@@ -77,7 +77,7 @@ export default function ComplaintsPage() {
           </div>
 
           {/* Photo attachment */}
-          <ImageUploader
+          <ComplaintImageUploader
             label="Attach Photos (optional)"
             uploadFn={(fd) => uploadComplaintImage(fd).then(r => r)}
             onUploaded={(imgs) => setAttachedImages(prev => [...prev, ...imgs])}
