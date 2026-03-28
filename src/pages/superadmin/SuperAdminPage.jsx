@@ -11,7 +11,9 @@ import {
   Plus, Trash2, X, Eye, Ban, UserCheck, RefreshCw, Key,
   ChevronRight, AlertTriangle, CheckCircle2, RotateCcw,
   TrendingUp, DollarSign, Building2, UserX, Edit3, Save,
+  Navigation2, Image as GymImageIcon,
 } from 'lucide-react';
+import { GymImageManager } from '../../components/ImageUpload';
 import {
   saGetStats, saGetConfig, saUpdateConfig,
   saCreateGym, saDeleteGym, saReactivateGym,
@@ -254,7 +256,7 @@ function GymsTab() {
             <div><label className="label">Google Maps Link</label>
               <input className="input-field" placeholder="https://maps.google.com/?q=..." defaultValue={editGym.mapLink||''}
                 onChange={e => setEditGym({ ...editGym, mapLink: e.target.value })} /></div>
-            <div><label className="label">Gym Photos</label>
+            <div><label className="label">📷 Gym Photos</label>
               <GymImageManager gymId={editGym.id} images={editGym.images||[]} onImagesChange={(imgs)=>setEditGym({...editGym,images:imgs})} /></div>
             <button onClick={() => editMut.mutate({ gymId: editGym.id, data: { description: editGym.description, capacityPerSlot: editGym.capacityPerSlot, gender: editGym.gender, mapLink: editGym.mapLink || '' } })}
               disabled={editMut.isPending} className="btn-primary w-full flex items-center justify-center gap-2">
