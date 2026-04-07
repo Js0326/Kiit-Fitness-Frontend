@@ -7,10 +7,10 @@ import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
 import { ChevronLeft, Dumbbell, Eye, EyeOff, Copy, CheckCircle2, Mail, Hash } from 'lucide-react';
 
-const HOSTELS = [
-  'NH-1','NH-2','NH-3','NH-4','NH-5','NH-6','NH-7','NH-8','NH-9',
-  'NH-10','NH-11','NH-12','NH-13','NH-14','NH-15','NH-16',
-];
+// Boys hostels: KP-1 to KP-18 | Girls hostels: QC-1 to QC-16
+const HOSTELS_BOYS  = Array.from({length:18}, (_,i) => `KP-${i+1}`);
+const HOSTELS_GIRLS = Array.from({length:16}, (_,i) => `QC-${i+1}`);
+const HOSTELS = [...HOSTELS_BOYS, ...HOSTELS_GIRLS];
 const steps = ['Details', 'Verify', 'Done'];
 
 export default function RegisterPage() {
